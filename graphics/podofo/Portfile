@@ -3,13 +3,14 @@
 PortSystem          1.0
 PortGroup           cmake 1.1
 PortGroup           github 1.0
+PortGroup           legacysupport 1.1
 PortGroup           openssl 1.0
 
-github.setup        podofo podofo 1.0.3
+github.setup        podofo podofo 1.1.1
 github.tarball_from archive
 revision            0
 
-license             GPL-2+ LGPL-2+
+license             {LGPL-2+ MPL-2}
 categories          graphics
 maintainers         {devans @dbevans} openmaintainer
 
@@ -18,9 +19,9 @@ long_description    The PoDoFo library is a free portable C++ library which incl
                     classes to parse a PDF file and modify its contents into memory. \
                     The changes can be written back to disk easily.
 
-checksums           sha256  02815b21a51632c2849d41b067597e9356bbc54bad0efcd84c902b555c203ce7 \
-                    rmd160  a9df9906f7154647e4234bc2cfe58fb015e7fb24 \
-                    size    3360409
+checksums           sha256  16943528b37798d8663ffedc97190803e525d0a1dcb021fdbf9d35242831890a \
+                    rmd160  ecda5fddc128e08fb23af50cf08f3ee0e6b6a37a \
+                    size    4379101
 
 depends_lib-append  port:freetype \
                     port:fontconfig \
@@ -36,6 +37,22 @@ depends_lib-append  port:freetype \
 
 compiler.cxx_standard 2017
 compiler.thread_local_storage yes
+
+# 13.3, to_chars
+legacysupport.newest_darwin_requires_legacy \
+                    22
+if {${os.platform} eq "darwin" && ${os.major} <= 22} {
+    # TODO when macports-libcxx is bumped to clang 17, this is not needed
+    # clang 16 and lower lacks to_chars in the libc++ dylibs
+    depends_lib-append \
+                    port:clang-17
+    configure.ldflags-append \
+                    -L${prefix}/libexec/llvm-17/lib/libc++
+    configure.cppflags-append \
+                    -nostdinc++ \
+                    -isystem${prefix}/libexec/llvm-17/include/c++/v1 \
+                    -D_LIBCPP_DISABLE_AVAILABILITY=1
+}
 
 configure.args-append \
                     -DPODOFO_WANT_LCMS2=TRUE \
