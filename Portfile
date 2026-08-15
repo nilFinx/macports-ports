@@ -1,0 +1,174 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+
+PortSystem          1.0
+PortGroup           meson  1.0
+
+# BUMP THEN RELEASE. NO RELEASE BEFORE BUMP. THIS PROJECT CANNOT WORK WITHOUT BUMP OR A PATCH UNLESS PYTHON3 IS SET
+name                pidgin3
+version             2.96.0
+revision            0
+categories          net
+license             GPL-2+
+maintainers         {devans @dbevans} openmaintainer
+description         Multi-protocol Instant Messaging client
+# TODO better description? This sound like peak Y2K advertisement
+long_description    Pidgin is an Instant Messenger client that uses GTK+ version 4. \
+                    It features multiple groups, group chat, user information \
+                    fetching and registration, time stamping, and more.  It \
+                    also supports other IM protocols, via included plugins.
+
+homepage            https://www.pidgin.im/
+master_sites        sourceforge:project/pidgin/Pidgin3/${version}
+
+checksums           rmd160  ca8a94f6eda2ee77ebc5ec11a7f756235bb62782 \
+                    sha256  f44a282246dd74910810a00f6cce8914122220cf79a808d9ac1975f75fa3e00a \
+                    size    1047692
+
+use_xz              yes
+
+meson.wrap_mode     nodownload
+
+compiler.c_standard 2017
+
+depends_build-append \
+                    port:gettext \
+                    path:lib/pkgconfig/gobject-introspection-1.0.pc:gobject-introspection \
+                    path:bin/pkg-config:pkgconfig
+
+depends_lib         port:gi-docgen
+
+
+subport birb {
+    version                 0.9.0
+
+    distname                ${subport}-${version}
+    master_sites            sourceforge:project/pidgin/${subport}/${version}
+
+    checksums               rmd160  d5fe5e10be908bfdc3d68c27ebbd4b81c9542b27 \
+                            sha256  adb427013b56e66c820f2dfdda7bf267de3d50dac40424200f1acde088f6861b \
+                            size    49772
+}
+
+subport gplugin {
+    version                 0.44.2
+
+    distname                ${subport}-${version}
+    master_sites            sourceforge:project/pidgin/${subport}/${version}
+
+    checksums               rmd160  188ea6aa7898ca769fb3c088367af4bcccd3eecb \
+                            sha256  aea244e1add9628b50ec042c54cf93803f4577f8f142678f09b91fd4c0b20f72 \
+                            size    97900
+
+    depends_lib-append      port:py314-gobject3 \
+                            port:help2man \
+                            port:lua51-lgi \
+                            port:luajit
+
+    configure.pkg_config_path \
+                            ${prefix}/Library/Frameworks/Python.framework/Versions/3.14/lib/pkgconfig
+}
+
+subport hasl {
+    version                 0.5.0
+
+    distname                ${subport}-${version}
+    master_sites            sourceforge:project/pidgin/${subport}/${version}
+
+    checksums               rmd160  aad43eafd26d794fa09972848bee87108a9f5f94 \
+                            sha256  01883cdae45137d7ca3ef9cb767f91a57c48294f32e430e0c5ce64f45ff83019 \
+                            size    37180
+}
+
+subport ibis {
+    version                 0.16.0
+
+    distname                ${subport}-${version}
+    master_sites            sourceforge:project/pidgin/${subport}/${version}
+
+    checksums               rmd160  421c5c0444590775fd9414a27f0a79337e6d6faa \
+                            sha256  ea9ee73aa89756243a8ffb8d32431dee5d388a971bc34f8a96d0b1d7e7b9d6c1 \
+                            size    87680
+
+    depends_lib-append      port:hasl
+}
+
+subport seagull {
+    version                 0.8.2
+
+    distname                ${subport}-${version}
+    master_sites            sourceforge:project/pidgin/${subport}/${version}
+
+    checksums               rmd160  05f6ac0ecdbc81fe77c0d5d7e5f54b306f64783f \
+                            sha256  ad676236083858b3adab61eca836b4f49b847509a1b4c4626b404e5034e3a6ee \
+                            size    38300
+}
+
+subport xeme {
+    version                 c04f8a4edc0f
+
+    distname                ${version}
+    worksrcdir              ${subport}-${version}
+    master_sites            https://keep.imfreedom.org/${subport}/${subport}/archive/
+    use_bzip2               yes
+
+    checksums               rmd160  b2f297ff0346e387da3b3ddefaf1a36ccba7916c \
+                            sha256  77605948cb09596a29b6e60baa2e46f145e516311c4c6391d7de7143573abfb9 \
+                            size    40390
+
+    depends_lib-append      port:birb
+}
+
+subport libpurple3 {
+    dist_subdir             ${name}/${version}
+
+    depends_lib-append      port:birb \
+                            port:gplugin \
+                            port:gstreamer1 \
+                            port:hasl \
+                            port:json-glib \
+                            port:libsoup \
+                            port:pango \
+                            port:seagull \
+                            port:tcl \
+                            port:tk
+
+    configure.args          -Dgtkui=false
+}
+
+if {${subport} eq $name} {
+    dist_subdir             ${name}/${version}
+
+    depends_lib-append      port:gtk4 \
+                            port:gtksourceview5 \
+                            port:libadwaita
+
+    post-activate {
+        system "${prefix}/bin/glib-compile-schemas ${prefix}/share/glib-2.0/schemas"
+        system "${prefix}/bin/gtk4-update-icon-cache -f -t ${prefix}/share/icons/hicolor"
+    }
+}
+
+if {${subport} ne "libpurple3"} {
+    post-destroot {
+        foreach file [glob -nocomplain -directory ${destroot}${prefix}/share/locale/ */LC_MESSAGES/pidgin3.mo] {
+            delete $file
+        }
+        foreach file [glob -nocomplain -directory ${destroot}${prefix}/lib pkgconfig/purple-3.pc girepository-1.0/Purple-3.0.typelib libpurple3* purple-3] {
+            delete $file
+        }
+        delete  ${destroot}${prefix}/include/purple-3 \
+                ${destroot}${prefix}/share/gir-1.0/Purple-3.0.gir \
+                ${destroot}${prefix}/share/glib-2.0/schemas/im.pidgin.Purple.gschema.xml
+    }
+}
+
+livecheck.type      regex
+livecheck.url       http://sourceforge.net/projects/pidgin/files/Pidgin3/
+livecheck.regex     "\/Pidgin3\/(\\d+(?:\\.\\d+)*)\/"
+
+notes "
+This is an experimental version of Pidgin, libpurple or its dependencies, or a library that's mostly used by it.
+A lot of core features, including creating a direct message is not available yet.
+I think you already know this if you came to my downstream macports-ports instead of the upstream.
+Please don't bother the developers too much...
+"

@@ -1,8 +1,4 @@
-# macports-ports nf
+# Pidgin/libpurple 3
 
-yes i port to maverick
-
-## Branches
-
-* `pidgin3` - PIDGIN 3 BEFORE HL3??? WTF LA!
-* * HEAVILY EXPERIMENTAL - DO NOT REPORT MISSING FEATURES, CARE ABOUT LOOKING FOR DUPE ISSUES
+WARNING: You can NOT use this without `port select`ing Python 3 yet.
+MacPorts makes system Python 3 not resolve with env magic anc MP Python3.xx cannot be resolved on the version this thing is on.
