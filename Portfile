@@ -1,0 +1,176 @@
+PortSystem      1.0
+PortGroup       active_variants 1.1
+PortGroup       app             1.1
+PortGroup       cmake           1.1
+PortGroup       legacysupport   1.1
+PortGroup       github          1.0
+
+name            tomato-devel
+categories      net
+# undecided
+license         unknown
+maintainers     {disroot.org:nulflox @nilFinx} openmaintainer
+
+description     An advanced Tox client using ImGui, with a plugin system
+
+fetch.type      git
+
+# TODO not do this
+post-fetch {
+    system -W ${worksrcpath} "git submodule update --init --recursive"
+}
+
+# 17 (10.13) supports SDL3
+if {${os.platform} eq "darwin" && ${os.major} > 16} {
+    default_variants +sdl3 +av
+} else {
+    default_variants +sdl2
+}
+
+depends_lib     port:zstd
+
+configure.args-append \
+                -DTOMATO_TOX_AV=OFF
+
+# ImGui fix
+configure.cppflags-append \
+                -DTARGET_OS_OSX=1
+
+# std::filesystem
+legacysupport.use_mp_libcxx \
+                yes
+
+legacysupport.newest_darwin_requires_legacy \
+                18
+
+compiler.cxx_standard \
+                2017
+
+# SDL2 support will be added later. Potentially no camera though.
+variant av conflicts sdl2 description "With AV" {
+    configure.args-append \
+                    -DTOMATO_TOX_AV=ON
+
+    configure.args-delete \
+                    -DTOMATO_TOX_AV=OFF
+}
+
+if {${subport} eq ${name}} {
+    version         916
+    revision        0
+
+    configure.args-append \
+                    -DTOMATO_DEP_LIBWEBP_USE_SYSTEM=ON \
+                    -DTOMATO_DEP_SDL_USE_SYSTEM=ON \
+                    -DTOMATO_DEP_SDL_IMAGE_USE_SYSTEM=ON \
+
+    app.executable  ${prefix}/bin/tomato
+    app.icon        res/icon/tomato_v1_256.png
+    app.name        tomato
+
+    depends_lib-append \
+                    port:webp
+
+    variant sdl2 conflicts sdl3 av description "With SDL2 instead of SDL3 (downstream)" {
+        dist_subdir     ${name}-nilFinx-${version}
+
+        # since my fork can be outdated, we also set the version/rev here even if it is currently same as the upstream
+        version         916
+        revision        0
+
+        github.setup    nilFinx tomato e03c045af1ff18f598f98ee7eefc4bbd297e5a5e
+
+        depends_lib-append  \
+                        port:libsdl2 \
+                        port:libsdl2_image
+
+        configure.args-append \
+                        -DTOMATO_USE_SDL2=ON
+
+        notes-append "
+
+        SDL2 is an experimental option of a tomato fork.
+        Any issues found should go to https://github.com/nilFinx/tomato/issues instead of upstream by Green-Sky.
+        "
+    }
+
+    variant sdl3 conflicts sdl2 {
+        github.setup        Green-Sky tomato aaa42a76ec503e7acd2df827e065580a655118c2
+
+        depends_lib-append  port:SDL3 \
+                            port:SDL3_image
+
+        notes-append "
+
+        SDL3 is only supported on GPUs with Metal support.
+        If you are using a machine that's stuck on 10.13 due to GPU,
+        or you're using OpenCore Legacy Patcher or similar on a non-Metal GPU,
+        you will have to use the +sdl2 variant.
+        "
+    }
+}
+
+# Don't use ${name} here, because tomato-devel-plugins sounds ugly.
+subport tomato-plugins-devel {
+    github.setup        Green-Sky solanaceae_ecosystem e43b770c84d1b81505fd2629a4d4ce46c22cfb89
+    version             298
+
+    description         Various plugins for tomato-devel
+
+    app.create          no
+
+    # cxx20 requires clang 16 libcxx
+    depends_lib-append  port:entt \
+                        port:clang-16
+
+    configure.args-append \
+                        -DBUILD_SHARED_LIBS=ON
+
+    # <ranges>
+    compiler.cxx_standard \
+                        2020
+
+    post-destroot {
+        # TODO: Don't even compile and install them. Something upstream should do.
+        delete ${destroot}${prefix}/bin/DHT_bootstrap \
+               ${destroot}${prefix}/include/tox
+               ${destroot}${prefix}/lib/libtoxcore*
+               ${destroot}${prefix}/lib/pkgconfig
+    }
+
+    # has to be placed above the below if
+    notes-append "
+
+    tomato, or any other clients using these plugins is not installed by default, as this can be used on anything solanaeae, not just tomato.
+
+    Plugins are not enabled by default. Please browse (${prefix} or /opt/local)/lib/ for plugins.
+    "
+
+    if {${os.platform} eq "darwin" && ${os.major} <= 18} {
+        # TODO: Resolve issues in cpp-httplib port on legacy OS (known fail on 10.9)
+        # TODO: For now, get an accurate version range for this
+        patchfiles          remove-llama-cpp-plugin.diff
+        # TODO: no>yes, remove compiler flags and llvm-16 dependency once macports-libcxx is bumped to LLVM 16 for <ranges>
+        legacysupport.use_mp_libcxx \
+                            no
+        configure.ldflags-append \
+                            -L${prefix}/libexec/llvm-16/lib/libc++
+        configure.cppflags-append \
+                            -nostdinc++ \
+                            -isystem${prefix}/libexec/llvm-16/include/c++/v1 \
+                            -D_LIBCPP_DISABLE_AVAILABILITY=1
+
+        notes-append "
+
+        llama.cpp plugin is currently disabled for your OS due to known legacy incompatibility with cpp-httplib on OS X 10.9.
+        If you're able to install cpp-httplib fine, please make a trac issue, or contact the maintainer nilFinx with your OS version,
+        so the version is corraected to have llama.cpp plugin for your platform.
+        "
+    }
+}
+
+# note, the last upstream release was August 2025 at the time of writing
+notes "
+While this is a devel package, this is basically the version you should use as of now.
+Stable version of this port will be available once the upstream starts pushing stable releases often.
+"
